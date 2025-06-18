@@ -1,112 +1,154 @@
 
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { 
-  BarChart3, 
-  FileText, 
-  Shield, 
-  Users, 
-  ClipboardList, 
-  MessageSquare, 
-  BookOpen, 
-  GraduationCap 
-} from 'lucide-react';
-import { Link } from 'react-router-dom';
-
-const features = [
-  {
-    icon: BarChart3,
-    title: 'Automatic Grading',
-    description: 'AI-powered grading with detailed analytics and feedback',
-    href: '/automatic-grading',
-    color: 'bg-blue-600'
-  },
-  {
-    icon: FileText,
-    title: 'Summarize Articles',
-    description: 'Generate comprehensive summaries of educational content',
-    href: '/summarize-articles',
-    color: 'bg-green-600'
-  },
-  {
-    icon: Shield,
-    title: 'Plagiarism Check',
-    description: 'Detect potential plagiarism with AI analysis',
-    href: '/plagiarism-check',
-    color: 'bg-red-600'
-  },
-  {
-    icon: Users,
-    title: 'IEP-Aware Rewrite',
-    description: 'Adapt content for students with special needs',
-    href: '/iep-rewrite',
-    color: 'bg-purple-600'
-  },
-  {
-    icon: ClipboardList,
-    title: 'Rubric Generator',
-    description: 'Create detailed rubrics for assignments',
-    href: '/rubric-generator',
-    color: 'bg-yellow-600'
-  },
-  {
-    icon: MessageSquare,
-    title: 'Report Card Comments',
-    description: 'Generate professional report card comments',
-    href: '/report-card-comments',
-    color: 'bg-pink-600'
-  },
-  {
-    icon: BookOpen,
-    title: 'Curriculum Analyzer',
-    description: 'Analyze curriculum alignment with standards',
-    href: '/curriculum-analyzer',
-    color: 'bg-indigo-600'
-  },
-  {
-    icon: GraduationCap,
-    title: 'Lesson Plan Generator',
-    description: 'Create comprehensive lesson plans instantly',
-    href: '/lesson-plan-generator',
-    color: 'bg-teal-600'
-  }
-];
+import { Progress } from '@/components/ui/progress';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { usageService } from '@/services/usage';
+import { Calendar, Clock, TrendingUp, User, CreditCard, Shield } from 'lucide-react';
 
 const Home = () => {
   const { user } = useAuth();
+  const usageData = usageService.getUsageData();
 
   return (
     <div className="space-y-6">
-      <div className="text-center py-8">
-        <h1 className="text-4xl font-bold text-white mb-4">
-          Welcome back, {user?.displayName || user?.email?.split('@')[0]}!
+      {/* Welcome Section */}
+      <div className="border-l-4 border-white pl-6">
+        <h1 className="text-3xl font-bold text-white mb-2">
+          Welcome back, {user?.displayName || 'Demo Teacher'}!
         </h1>
-        <p className="text-gray-400 text-lg">
-          Choose a tool below to start automating your teaching tasks
+        <p className="text-gray-400">
+          Ready to automate your teaching tasks with AI-powered tools
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-        {features.map((feature) => {
-          const Icon = feature.icon;
-          return (
-            <Link key={feature.href} to={feature.href}>
-              <Card className="bg-card border-border hover:bg-accent transition-colors cursor-pointer h-full">
-                <CardHeader className="pb-4">
-                  <div className={`w-12 h-12 rounded-lg ${feature.color} flex items-center justify-center mb-4`}>
-                    <Icon className="text-white" size={24} />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Account Information */}
+        <div className="space-y-4">
+          <Card className="bg-card border-border">
+            <CardHeader>
+              <CardTitle className="text-white flex items-center gap-2">
+                <User className="w-5 h-5" />
+                Account Status
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 gap-4">
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-400">Account Type</span>
+                  <span className="text-green-400 font-medium">Premium</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-400">Account ID</span>
+                  <span className="text-white font-mono">{user?.uid?.substring(0, 8) || 'demo-usr'}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-400">Member Since</span>
+                  <span className="text-white">January 2024</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-400">Subscription</span>
+                  <div className="flex items-center gap-2">
+                    <Shield className="w-4 h-4 text-green-400" />
+                    <span className="text-green-400">Active</span>
                   </div>
-                  <CardTitle className="text-white text-lg">{feature.title}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <CardDescription className="text-gray-400">
-                    {feature.description}
-                  </CardDescription>
-                </CardContent>
-              </Card>
-            </Link>
-          );
-        })}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-card border-border">
+            <CardHeader>
+              <CardTitle className="text-white flex items-center gap-2">
+                <CreditCard className="w-5 h-5" />
+                Usage Limits
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <div className="flex justify-between text-sm mb-2">
+                  <span className="text-gray-400">Monthly API Calls</span>
+                  <span className="text-white">{usageData.thisMonthCalls} / 1000</span>
+                </div>
+                <Progress value={(usageData.thisMonthCalls / 1000) * 100} className="h-2" />
+              </div>
+              <div>
+                <div className="flex justify-between text-sm mb-2">
+                  <span className="text-gray-400">Daily Calls</span>
+                  <span className="text-white">{usageData.todayCalls} / 50</span>
+                </div>
+                <Progress value={(usageData.todayCalls / 50) * 100} className="h-2" />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Usage Analytics */}
+        <div className="space-y-4">
+          <Card className="bg-card border-border">
+            <CardHeader>
+              <CardTitle className="text-white flex items-center gap-2">
+                <TrendingUp className="w-5 h-5" />
+                API Usage Analytics
+              </CardTitle>
+              <CardDescription>Your AI tool usage over the past week</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={usageData.dailyUsage}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#333" />
+                    <XAxis 
+                      dataKey="date" 
+                      stroke="#666" 
+                      tickFormatter={(value) => new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    />
+                    <YAxis stroke="#666" />
+                    <Tooltip 
+                      contentStyle={{ 
+                        backgroundColor: '#000', 
+                        border: '1px solid #333',
+                        color: '#fff'
+                      }}
+                      labelFormatter={(value) => new Date(value).toLocaleDateString()}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="calls" 
+                      stroke="#fff" 
+                      strokeWidth={2}
+                      dot={{ fill: '#fff', strokeWidth: 2 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="grid grid-cols-3 gap-4">
+            <Card className="bg-card border-border">
+              <CardContent className="p-4 text-center">
+                <Calendar className="w-6 h-6 text-blue-400 mx-auto mb-2" />
+                <div className="text-xl font-bold text-white">{usageData.todayCalls}</div>
+                <div className="text-sm text-gray-400">Today</div>
+              </CardContent>
+            </Card>
+            <Card className="bg-card border-border">
+              <CardContent className="p-4 text-center">
+                <Clock className="w-6 h-6 text-green-400 mx-auto mb-2" />
+                <div className="text-xl font-bold text-white">{usageData.thisWeekCalls}</div>
+                <div className="text-sm text-gray-400">This Week</div>
+              </CardContent>
+            </Card>
+            <Card className="bg-card border-border">
+              <CardContent className="p-4 text-center">
+                <TrendingUp className="w-6 h-6 text-purple-400 mx-auto mb-2" />
+                <div className="text-xl font-bold text-white">{usageData.totalCalls}</div>
+                <div className="text-sm text-gray-400">Total</div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
       </div>
     </div>
   );

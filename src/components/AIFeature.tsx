@@ -5,10 +5,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
 import { Loader2, Upload, Download } from 'lucide-react';
 import { saveToHistory } from '@/utils/history';
 import { exportResponse } from '@/utils/export';
+import { usageService } from '@/services/usage';
 
 interface AIFeatureProps {
   title: string;
@@ -34,6 +36,7 @@ export const AIFeature: React.FC<AIFeatureProps> = ({
   const [additionalData, setAdditionalData] = useState<Record<string, string>>({});
   const [response, setResponse] = useState('');
   const [loading, setLoading] = useState(false);
+  const [progress, setProgress] = useState(0);
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -55,15 +58,32 @@ export const AIFeature: React.FC<AIFeatureProps> = ({
     }
 
     setLoading(true);
+    setProgress(0);
+    
+    // Simulate progress
+    const progressInterval = setInterval(() => {
+      setProgress(prev => {
+        if (prev >= 90) {
+          clearInterval(progressInterval);
+          return prev;
+        }
+        return prev + 10;
+      });
+    }, 200);
+
     try {
       const result = await onSubmit(input, additionalData);
       setResponse(result);
+      setProgress(100);
+      usageService.incrementUsage();
       toast.success('Response generated successfully!');
     } catch (error) {
       console.error('Error:', error);
-      toast.error('Failed to generate response. Please try again.');
+      toast.error(error instanceof Error ? error.message : 'Failed to generate response. Please try again.');
     } finally {
+      clearInterval(progressInterval);
       setLoading(false);
+      setTimeout(() => setProgress(0), 1000);
     }
   };
 
@@ -85,6 +105,20 @@ export const AIFeature: React.FC<AIFeatureProps> = ({
         <h1 className="text-3xl font-bold text-white mb-2">{title}</h1>
         <p className="text-gray-400">{description}</p>
       </div>
+
+      {loading && (
+        <Card className="bg-card border-border">
+          <CardContent className="p-6">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-white">Generating response...</span>
+                <span className="text-gray-400">{progress}%</span>
+              </div>
+              <Progress value={progress} className="h-2" />
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="bg-card border-border">
