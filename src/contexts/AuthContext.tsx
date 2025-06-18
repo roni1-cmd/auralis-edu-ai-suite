@@ -26,12 +26,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setUser(user);
-      setLoading(false);
-    });
-
-    return unsubscribe;
+    // Bypass authentication - create a mock user
+    const mockUser = {
+      uid: 'demo-user',
+      displayName: 'Demo Teacher',
+      email: 'teacher@auralis.com',
+      photoURL: null,
+    } as User;
+    
+    setUser(mockUser);
+    setLoading(false);
+    toast.success('Welcome to Auralis!');
   }, []);
 
   const signInWithGoogle = async () => {
