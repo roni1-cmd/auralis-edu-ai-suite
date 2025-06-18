@@ -301,7 +301,7 @@
         function signInWithGoogle() {
             const provider = new firebase.auth.GoogleAuthProvider();
             auth.signInWithPopup(provider).then(() => {
-                window.location.href = 'test1.html';
+                window.location.href = '/src/page/Home.tsx';
             }).catch(err => {
                 console.error('Sign-in error:', err);
                 alert('Failed to sign in with Google: ' + err.message);
@@ -310,7 +310,7 @@
 
         auth.onAuthStateChanged(user => {
             if (user) {
-                window.location.href = 'https://auralisedu.netlify.app/';
+                window.location.href = '/src/page/Home.tsx';
             }
         });
     </script>
