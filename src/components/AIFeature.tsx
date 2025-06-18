@@ -7,10 +7,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
-import { Loader2, Upload, Download } from 'lucide-react';
+import { Loader2, Upload, Download, Save } from 'lucide-react';
 import { saveToHistory } from '@/utils/history';
 import { exportResponse } from '@/utils/export';
 import { usageService } from '@/services/usage';
+import { useAuth } from '@/contexts/AuthContext';
+import { db } from '@/services/firebase';
+import { collection, addDoc } from 'firebase/firestore';
 
 interface AIFeatureProps {
   title: string;
@@ -37,18 +40,71 @@ export const AIFeature: React.FC<AIFeatureProps> = ({
   const [response, setResponse] = useState('');
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
+  const { user } = useAuth();
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
+  const extractTextFromFile = async (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
       const reader = new FileReader();
+      
       reader.onload = (e) => {
         const content = e.target?.result as string;
-        setInput(content);
-        toast.success('File uploaded successfully!');
+        
+        // If it's a text file, return as is
+        if (file.type === 'text/plain') {
+          resolve(content);
+          return;
+        }
+        
+        // For other file types, try to extract readable text
+        try {
+          // Remove binary data and control characters
+          const cleanText = content
+            .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]/g, '') // Remove control characters
+            .replace(/PK[\s\S]*?xml/g, '') // Remove zip/docx metadata
+            .replace(/\�/g, '') // Remove replacement characters
+            .replace(/[^\x20-\x7E\s]/g, '') // Keep only printable ASCII and whitespace
+            .replace(/\s+/g, ' ') // Normalize whitespace
+            .trim();
+          
+          if (cleanText.length < 10) {
+            reject(new Error('Unable to extract readable text from this file. Please try a .txt file or copy-paste your content.'));
+          } else {
+            resolve(cleanText);
+          }
+        } catch (error) {
+          reject(new Error('Error processing file. Please try a .txt file instead.'));
+        }
       };
+      
+      reader.onerror = () => {
+        reject(new Error('Error reading file'));
+      };
+      
       reader.readAsText(file);
+    });
+  };
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      try {
+        const content = await extractTextFromFile(file);
+        setInput(content);
+        toast.success('File uploaded and processed successfully!');
+      } catch (error) {
+        console.error('File upload error:', error);
+        toast.error(error instanceof Error ? error.message : 'Failed to process file');
+      }
     }
+  };
+
+  const formatAIResponse = (text: string): string => {
+    return text
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') // Bold text
+      .replace(/\*(.*?)\*/g, '<em>$1</em>') // Italic text
+      .replace(/\n\n/g, '</p><p>') // Paragraphs
+      .replace(/\n/g, '<br>') // Line breaks
+      .replace(/^(.*)$/, '<p>$1</p>'); // Wrap in paragraph
   };
 
   const handleSubmit = async () => {
@@ -60,7 +116,6 @@ export const AIFeature: React.FC<AIFeatureProps> = ({
     setLoading(true);
     setProgress(0);
     
-    // Simulate progress
     const progressInterval = setInterval(() => {
       setProgress(prev => {
         if (prev >= 90) {
@@ -73,7 +128,8 @@ export const AIFeature: React.FC<AIFeatureProps> = ({
 
     try {
       const result = await onSubmit(input, additionalData);
-      setResponse(result);
+      const formattedResponse = formatAIResponse(result);
+      setResponse(formattedResponse);
       setProgress(100);
       usageService.incrementUsage();
       toast.success('Response generated successfully!');
@@ -99,6 +155,29 @@ export const AIFeature: React.FC<AIFeatureProps> = ({
     }
   };
 
+  const handleSaveToFirestore = async () => {
+    if (!user || !response) {
+      toast.error('Please sign in to save responses to your account.');
+      return;
+    }
+
+    try {
+      await addDoc(collection(db, 'ai_responses'), {
+        userId: user.uid,
+        feature: title,
+        input: input.substring(0, 100) + (input.length > 100 ? '...' : ''),
+        response: response,
+        timestamp: new Date(),
+        userEmail: user.email,
+        userName: user.displayName
+      });
+      toast.success('Response saved to your account!');
+    } catch (error) {
+      console.error('Error saving to Firestore:', error);
+      toast.error('Failed to save to your account. Please try again.');
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -114,14 +193,20 @@ export const AIFeature: React.FC<AIFeatureProps> = ({
                 <span className="text-white">Generating response...</span>
                 <span className="text-gray-400">{progress}%</span>
               </div>
-              <Progress value={progress} className="h-2" />
+              <Progress 
+                value={progress} 
+                className="h-2 bg-gray-800"
+                style={{
+                  background: 'linear-gradient(to right, rgb(63, 159, 255), rgb(156, 77, 255))'
+                }}
+              />
             </div>
           </CardContent>
         </Card>
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="bg-card border-border">
+        <Card className="bg-card border-border border-[rgb(63,159,255)]/20">
           <CardHeader>
             <CardTitle className="text-white">Input</CardTitle>
             <CardDescription>Enter your content or upload a file</CardDescription>
@@ -178,7 +263,7 @@ export const AIFeature: React.FC<AIFeatureProps> = ({
               <Button
                 variant="outline"
                 onClick={() => document.getElementById('file-upload')?.click()}
-                className="border-border text-white hover:bg-accent"
+                className="border-[rgb(156,77,255)] text-[rgb(156,77,255)] hover:bg-[rgb(156,77,255)]/10"
               >
                 <Upload size={16} className="mr-2" />
                 Upload File
@@ -187,7 +272,7 @@ export const AIFeature: React.FC<AIFeatureProps> = ({
               <Button 
                 onClick={handleSubmit} 
                 disabled={loading}
-                className="bg-white text-black hover:bg-gray-100"
+                className="bg-gradient-to-r from-[rgb(63,159,255)] to-[rgb(156,77,255)] text-white hover:opacity-90"
               >
                 {loading ? (
                   <>
@@ -202,7 +287,7 @@ export const AIFeature: React.FC<AIFeatureProps> = ({
           </CardContent>
         </Card>
 
-        <Card className="bg-card border-border">
+        <Card className="bg-card border-border border-[rgb(156,77,255)]/20">
           <CardHeader>
             <CardTitle className="text-white">Response</CardTitle>
             <CardDescription>AI-generated result</CardDescription>
@@ -211,41 +296,34 @@ export const AIFeature: React.FC<AIFeatureProps> = ({
             {response ? (
               <div className="space-y-4">
                 <div className="bg-input border border-border rounded-lg p-4 min-h-[200px] max-h-[400px] overflow-y-auto">
-                  <pre className="text-white whitespace-pre-wrap font-sans text-sm">
-                    {response}
-                  </pre>
+                  <div 
+                    className="text-white whitespace-pre-wrap font-sans text-sm"
+                    dangerouslySetInnerHTML={{ __html: response }}
+                  />
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap">
                   <Button
                     onClick={handleSaveToHistory}
                     variant="outline"
-                    className="border-border text-white hover:bg-accent"
+                    className="border-[rgb(63,159,255)] text-[rgb(63,159,255)] hover:bg-[rgb(63,159,255)]/10"
                   >
                     Save to History
                   </Button>
                   <Button
-                    onClick={() => exportResponse(response, title, 'pdf')}
+                    onClick={handleSaveToFirestore}
+                    variant="outline"
+                    className="border-[rgb(255,77,156)] text-[rgb(255,77,156)] hover:bg-[rgb(255,77,156)]/10"
+                  >
+                    <Save size={16} className="mr-2" />
+                    Save to Account
+                  </Button>
+                  <Button
+                    onClick={() => exportResponse(response.replace(/<[^>]*>/g, ''), title, 'pdf')}
                     variant="outline"
                     className="border-border text-white hover:bg-accent"
                   >
                     <Download size={16} className="mr-2" />
                     Export PDF
-                  </Button>
-                  <Button
-                    onClick={() => exportResponse(response, title, 'json')}
-                    variant="outline"
-                    className="border-border text-white hover:bg-accent"
-                  >
-                    <Download size={16} className="mr-2" />
-                    Export JSON
-                  </Button>
-                  <Button
-                    onClick={() => exportResponse(response, title, 'txt')}
-                    variant="outline"
-                    className="border-border text-white hover:bg-accent"
-                  >
-                    <Download size={16} className="mr-2" />
-                    Export TXT
                   </Button>
                 </div>
               </div>

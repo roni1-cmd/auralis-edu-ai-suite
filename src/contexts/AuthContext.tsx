@@ -26,22 +26,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Bypass authentication - create a mock user
-    const mockUser = {
-      uid: 'demo-user',
-      displayName: 'Demo Teacher',
-      email: 'teacher@auralis.com',
-      photoURL: null,
-    } as User;
-    
-    setUser(mockUser);
-    setLoading(false);
-    toast.success('Welcome to Auralis!');
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      console.log('Auth state changed:', user);
+      setUser(user);
+      setLoading(false);
+      
+      if (user) {
+        toast.success(`Welcome back, ${user.displayName || user.email}!`);
+      }
+    });
+
+    return () => unsubscribe();
   }, []);
 
   const signInWithGoogle = async () => {
     try {
-      await signInWithPopup(auth, googleProvider);
+      const result = await signInWithPopup(auth, googleProvider);
+      console.log('Sign in successful:', result.user);
       toast.success('Successfully signed in!');
     } catch (error) {
       console.error('Error signing in:', error);
@@ -53,6 +54,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       await signOut(auth);
       toast.success('Successfully signed out!');
+      // Redirect to auth.html
+      window.location.href = '/auth.html';
     } catch (error) {
       console.error('Error signing out:', error);
       toast.error('Failed to sign out.');

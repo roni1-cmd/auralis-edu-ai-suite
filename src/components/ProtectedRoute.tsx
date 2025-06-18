@@ -1,6 +1,7 @@
 
 import { useAuth } from '@/contexts/AuthContext';
-import { Navigate } from 'react-router-dom';
+import LoadingScreen from '@/components/LoadingScreen';
+import { useEffect } from 'react';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -9,15 +10,21 @@ interface ProtectedRouteProps {
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   const { user, loading } = useAuth();
 
+  useEffect(() => {
+    if (!loading && !user) {
+      // Redirect to auth.html if not authenticated
+      window.location.href = '/auth.html';
+    }
+  }, [user, loading]);
+
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-black">
-        <div className="text-white text-lg">Loading...</div>
-      </div>
-    );
+    return <LoadingScreen />;
   }
 
-  // Always allow access for now
+  if (!user) {
+    return <LoadingScreen />;
+  }
+
   return <>{children}</>;
 };
 
