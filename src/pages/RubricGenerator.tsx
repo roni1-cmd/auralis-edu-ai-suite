@@ -10,6 +10,7 @@ import { toast } from 'sonner';
 import { Loader2, Upload } from 'lucide-react';
 import { fireworksService } from '@/services/fireworks';
 import { RubricDisplay } from '@/components/RubricDisplay';
+import mammoth from 'mammoth';
 
 const RubricGenerator = () => {
   const [assignment, setAssignment] = useState('');
@@ -17,6 +18,78 @@ const RubricGenerator = () => {
   const [response, setResponse] = useState('');
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
+
+  const extractTextFromFile = async (file: File): Promise<string> => {
+    return new Promise(async (resolve, reject) => {
+      try {
+        // Handle DOCX files with mammoth
+        if (file.name.toLowerCase().endsWith('.docx')) {
+          const arrayBuffer = await file.arrayBuffer();
+          const result = await mammoth.extractRawText({ arrayBuffer });
+          if (result.value && result.value.trim().length > 0) {
+            resolve(result.value.trim());
+            return;
+          }
+        }
+
+        // Handle other files with FileReader
+        const reader = new FileReader();
+        
+        reader.onload = (e) => {
+          const content = e.target?.result as string;
+          
+          // If it's a text file, return as is
+          if (file.type === 'text/plain' || file.name.toLowerCase().endsWith('.txt')) {
+            resolve(content);
+            return;
+          }
+          
+          // For other file types, try to extract readable text
+          try {
+            // Remove binary data and control characters
+            const cleanText = content
+              .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]/g, '') // Remove control characters
+              .replace(/PK[\s\S]*?xml/g, '') // Remove zip/docx metadata
+              .replace(/\�/g, '') // Remove replacement characters
+              .replace(/[^\x20-\x7E\s\u00A0-\uFFFF]/g, '') // Keep printable characters and Unicode
+              .replace(/\s+/g, ' ') // Normalize whitespace
+              .trim();
+            
+            if (cleanText.length < 10) {
+              reject(new Error('Unable to extract readable text from this file. Please try a .txt or .docx file.'));
+            } else {
+              resolve(cleanText);
+            }
+          } catch (error) {
+            reject(new Error('Error processing file. Please try a .txt or .docx file instead.'));
+          }
+        };
+        
+        reader.onerror = () => {
+          reject(new Error('Error reading file'));
+        };
+        
+        reader.readAsText(file, 'UTF-8');
+      } catch (error) {
+        console.error('File processing error:', error);
+        reject(new Error('Failed to process file. Please try a .txt or .docx file.'));
+      }
+    });
+  };
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      try {
+        const content = await extractTextFromFile(file);
+        setAssignment(content);
+        toast.success('File uploaded and processed successfully!');
+      } catch (error) {
+        console.error('File upload error:', error);
+        toast.error(error instanceof Error ? error.message : 'Failed to process file');
+      }
+    }
+  };
 
   const handleSubmit = async () => {
     if (!assignment.trim()) {
@@ -108,20 +181,38 @@ const RubricGenerator = () => {
               />
             </div>
 
-            <Button 
-              onClick={handleSubmit} 
-              disabled={loading}
-              className="bg-gradient-to-r from-[rgb(63,159,255)] to-[rgb(156,77,255)] text-white hover:opacity-90 w-full"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Generating Rubric...
-                </>
-              ) : (
-                'Generate Rubric'
-              )}
-            </Button>
+            <div className="flex gap-2">
+              <Input
+                type="file"
+                accept=".txt,.doc,.docx,.pdf"
+                onChange={handleFileUpload}
+                className="hidden"
+                id="file-upload"
+              />
+              <Button
+                variant="outline"
+                onClick={() => document.getElementById('file-upload')?.click()}
+                className="border-[rgb(156,77,255)] text-[rgb(156,77,255)] hover:bg-[rgb(156,77,255)]/10"
+              >
+                <Upload size={16} className="mr-2" />
+                Upload File
+              </Button>
+              
+              <Button 
+                onClick={handleSubmit} 
+                disabled={loading}
+                className="bg-gradient-to-r from-[rgb(63,159,255)] to-[rgb(156,77,255)] text-white hover:opacity-90 flex-1"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Generating Rubric...
+                  </>
+                ) : (
+                  'Generate Rubric'
+                )}
+              </Button>
+            </div>
           </CardContent>
         </Card>
 

@@ -9,52 +9,69 @@ export interface AIResponse {
 }
 
 class FireworksService {
-  private async makeRequest(prompt: string, feature: string): Promise<string> {
-    try {
-      console.log('Making Mistral API request:', { prompt: prompt.substring(0, 100) + '...', feature });
-      
-      const response = await fetch('https://api.mistral.ai/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${MISTRAL_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: MISTRAL_MODEL,
-          messages: [
-            {
-              role: 'user',
-              content: prompt
-            }
-          ],
-          max_tokens: 4000,
-          temperature: 0.7,
-        }),
-      });
+  private async makeRequest(prompt: string, feature: string, retries = 3): Promise<string> {
+    for (let attempt = 1; attempt <= retries; attempt++) {
+      try {
+        console.log(`Making Mistral API request (attempt ${attempt}):`, { prompt: prompt.substring(0, 100) + '...', feature });
+        
+        const response = await fetch('https://api.mistral.ai/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${MISTRAL_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: MISTRAL_MODEL,
+            messages: [
+              {
+                role: 'user',
+                content: prompt
+              }
+            ],
+            max_tokens: 4000,
+            temperature: 0.7,
+          }),
+        });
 
-      console.log('Mistral API response status:', response.status);
+        console.log('Mistral API response status:', response.status);
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Mistral API error response:', errorText);
-        throw new Error(`API request failed with status ${response.status}: ${errorText}`);
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('Mistral API error response:', errorText);
+          
+          if (attempt === retries) {
+            throw new Error(`API request failed after ${retries} attempts. Status: ${response.status}`);
+          }
+          
+          // Wait before retry
+          await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+          continue;
+        }
+
+        const data = await response.json();
+        console.log('Mistral API response data received successfully');
+        
+        if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+          throw new Error('Invalid response format from API');
+        }
+
+        return data.choices[0].message.content;
+      } catch (error) {
+        console.error(`Mistral API error (attempt ${attempt}):`, error);
+        
+        if (attempt === retries) {
+          if (error instanceof Error) {
+            throw new Error(`Failed to generate AI response after ${retries} attempts: ${error.message}`);
+          }
+          throw new Error(`Failed to generate AI response after ${retries} attempts. Please try again.`);
+        }
+        
+        // Wait before retry
+        await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
       }
-
-      const data = await response.json();
-      console.log('Mistral API response data:', data);
-      
-      if (!data.choices || !data.choices[0] || !data.choices[0].message) {
-        throw new Error('Invalid response format from API');
-      }
-
-      return data.choices[0].message.content;
-    } catch (error) {
-      console.error('Mistral API error:', error);
-      if (error instanceof Error) {
-        throw new Error(`Failed to generate AI response: ${error.message}`);
-      }
-      throw new Error('Failed to generate AI response. Please try again.');
     }
+    
+    throw new Error('Unexpected error in API request');
   }
 
   async automaticGrading(content: string, criteria: string): Promise<string> {
@@ -122,17 +139,21 @@ Please provide:
   }
 
   async generateRubric(assignment: string, criteria: string): Promise<string> {
-    const prompt = `Create a detailed rubric for the following assignment. Include multiple performance levels and clear criteria.
+    const prompt = `Create a comprehensive, detailed rubric for the following assignment. Include specific percentage ranges and detailed criteria for each performance level.
 
 Assignment: ${assignment}
 
 Key Criteria to include: ${criteria}
 
-Please create a rubric with:
-1. 4-5 performance levels (Excellent, Good, Satisfactory, Needs Improvement, etc.)
-2. Clear descriptors for each level
-3. Point values or percentage weights
-4. Specific, measurable criteria`;
+Please create a detailed rubric with:
+1. 4 performance levels: Excellent (90-100%), Good (80-89%), Satisfactory (70-79%), Needs Improvement (0-69%)
+2. Specific percentage ranges for each level
+3. Detailed descriptors for each criterion at each level
+4. Clear, measurable expectations
+5. Specific point values and weights for each criterion
+6. Professional formatting suitable for educational use
+
+Format the response with clear sections and detailed descriptions for each performance level.`;
 
     return this.makeRequest(prompt, 'Rubric Generator');
   }
