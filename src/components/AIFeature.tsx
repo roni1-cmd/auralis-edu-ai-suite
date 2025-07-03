@@ -13,6 +13,7 @@ import { usageService } from '@/services/usage';
 import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/services/firebase';
 import { collection, addDoc } from 'firebase/firestore';
+import mammoth from 'mammoth';
 
 interface AIFeatureProps {
   title: string;
@@ -42,44 +43,60 @@ export const AIFeature: React.FC<AIFeatureProps> = ({
   const { user } = useAuth();
 
   const extractTextFromFile = async (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      
-      reader.onload = (e) => {
-        const content = e.target?.result as string;
-        
-        // If it's a text file, return as is
-        if (file.type === 'text/plain') {
-          resolve(content);
-          return;
-        }
-        
-        // For other file types, try to extract readable text
-        try {
-          // Remove binary data and control characters
-          const cleanText = content
-            .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]/g, '') // Remove control characters
-            .replace(/PK[\s\S]*?xml/g, '') // Remove zip/docx metadata
-            .replace(/\�/g, '') // Remove replacement characters
-            .replace(/[^\x20-\x7E\s]/g, '') // Keep only printable ASCII and whitespace
-            .replace(/\s+/g, ' ') // Normalize whitespace
-            .trim();
-          
-          if (cleanText.length < 10) {
-            reject(new Error('Unable to extract readable text from this file. Please try a .txt file or copy-paste your content.'));
-          } else {
-            resolve(cleanText);
+    return new Promise(async (resolve, reject) => {
+      try {
+        // Handle DOCX files with mammoth
+        if (file.name.toLowerCase().endsWith('.docx')) {
+          const arrayBuffer = await file.arrayBuffer();
+          const result = await mammoth.extractRawText({ arrayBuffer });
+          if (result.value && result.value.trim().length > 0) {
+            resolve(result.value.trim());
+            return;
           }
-        } catch (error) {
-          reject(new Error('Error processing file. Please try a .txt file instead.'));
         }
-      };
-      
-      reader.onerror = () => {
-        reject(new Error('Error reading file'));
-      };
-      
-      reader.readAsText(file);
+
+        // Handle PDF and other files with FileReader
+        const reader = new FileReader();
+        
+        reader.onload = (e) => {
+          const content = e.target?.result as string;
+          
+          // If it's a text file, return as is
+          if (file.type === 'text/plain' || file.name.toLowerCase().endsWith('.txt')) {
+            resolve(content);
+            return;
+          }
+          
+          // For other file types, try to extract readable text
+          try {
+            // Remove binary data and control characters
+            const cleanText = content
+              .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]/g, '') // Remove control characters
+              .replace(/PK[\s\S]*?xml/g, '') // Remove zip/docx metadata
+              .replace(/\�/g, '') // Remove replacement characters
+              .replace(/[^\x20-\x7E\s\u00A0-\uFFFF]/g, '') // Keep printable characters and Unicode
+              .replace(/\s+/g, ' ') // Normalize whitespace
+              .trim();
+            
+            if (cleanText.length < 10) {
+              reject(new Error('Unable to extract readable text from this file. Please try a .txt or .docx file.'));
+            } else {
+              resolve(cleanText);
+            }
+          } catch (error) {
+            reject(new Error('Error processing file. Please try a .txt or .docx file instead.'));
+          }
+        };
+        
+        reader.onerror = () => {
+          reject(new Error('Error reading file'));
+        };
+        
+        reader.readAsText(file, 'UTF-8');
+      } catch (error) {
+        console.error('File processing error:', error);
+        reject(new Error('Failed to process file. Please try a .txt or .docx file.'));
+      }
     });
   };
 
@@ -99,12 +116,12 @@ export const AIFeature: React.FC<AIFeatureProps> = ({
 
   const formatAIResponse = (text: string): string => {
     return text
-      .replace(/##\s+(.*?)\n/g, '<h2 class="text-xl font-bold text-white mt-6 mb-3 border-b border-gray-600 pb-2">$1</h2>') // ## headings
-      .replace(/\*\*(.*?)\*\*/g, '<strong class="font-semibold text-blue-300">$1</strong>') // Bold text
-      .replace(/\*(.*?)\*/g, '<em class="italic text-gray-300">$1</em>') // Italic text
-      .replace(/\n\n/g, '</p><p class="mb-4">') // Paragraphs
-      .replace(/\n/g, '<br>') // Line breaks
-      .replace(/^(.*)$/, '<p class="mb-4">$1</p>'); // Wrap in paragraph
+      .replace(/##\s+(.*?)(?=\n|$)/g, '<h2 class="text-xl font-bold text-white mt-6 mb-3 border-b-2 border-gradient-to-r from-[rgb(63,159,255)] to-[rgb(156,77,255)] pb-2 bg-gradient-to-r from-[rgb(63,159,255)] to-[rgb(156,77,255)] bg-clip-text text-transparent">$1</h2>')
+      .replace(/\*\*(.*?)\*\*/g, '<strong class="font-semibold text-[rgb(63,159,255)]">$1</strong>')
+      .replace(/\*(.*?)\*/g, '<em class="italic text-gray-300">$1</em>')
+      .replace(/\n\n/g, '</p><p class="mb-4">')
+      .replace(/\n/g, '<br>')
+      .replace(/^(.*)$/, '<p class="mb-4">$1</p>');
   };
 
   const handleSubmit = async () => {
