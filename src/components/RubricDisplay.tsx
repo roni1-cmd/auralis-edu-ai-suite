@@ -355,8 +355,6 @@ export const RubricDisplay: React.FC<RubricDisplayProps> = ({ response }) => {
 <body>
     <div class="rubric-container">
         <div class="header">
-            <h1>Professional Assessment Rubric</h1>
-            <div class="subtitle">Comprehensive Evaluation Framework with Percentage-Based Scoring</div>
         </div>
         <table>
             <thead>
@@ -426,7 +424,7 @@ export const RubricDisplay: React.FC<RubricDisplayProps> = ({ response }) => {
               hour: '2-digit',
               minute: '2-digit'
             })}</div>
-            <div class="watermark">Corea Starstroupe | All Rights Reserved</div>
+            <div class="watermark">Auralis - Corea Starstroupe | All Rights Reserved</div>
         </div>
     </div>
 </body>
