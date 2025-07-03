@@ -1,6 +1,5 @@
-
-const FIREWORKS_API_KEY = "fw_3ZWXAxAD6BWE4pgQkvkAqem3";
-const FIREWORKS_MODEL = "accounts/fireworks/models/llama-v3p1-405b-instruct";
+const MISTRAL_API_KEY = "t5hp7sTsKcKAwZycLxCUVtOKELwyedIk";
+const MISTRAL_MODEL = "mistral-large-latest";
 
 export interface AIResponse {
   content: string;
@@ -12,16 +11,16 @@ export interface AIResponse {
 class FireworksService {
   private async makeRequest(prompt: string, feature: string): Promise<string> {
     try {
-      console.log('Making Fireworks API request:', { prompt: prompt.substring(0, 100) + '...', feature });
+      console.log('Making Mistral API request:', { prompt: prompt.substring(0, 100) + '...', feature });
       
-      const response = await fetch('https://api.fireworks.ai/inference/v1/chat/completions', {
+      const response = await fetch('https://api.mistral.ai/v1/chat/completions', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${FIREWORKS_API_KEY}`,
+          'Authorization': `Bearer ${MISTRAL_API_KEY}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: FIREWORKS_MODEL,
+          model: MISTRAL_MODEL,
           messages: [
             {
               role: 'user',
@@ -33,16 +32,16 @@ class FireworksService {
         }),
       });
 
-      console.log('Fireworks API response status:', response.status);
+      console.log('Mistral API response status:', response.status);
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('Fireworks API error response:', errorText);
+        console.error('Mistral API error response:', errorText);
         throw new Error(`API request failed with status ${response.status}: ${errorText}`);
       }
 
       const data = await response.json();
-      console.log('Fireworks API response data:', data);
+      console.log('Mistral API response data:', data);
       
       if (!data.choices || !data.choices[0] || !data.choices[0].message) {
         throw new Error('Invalid response format from API');
@@ -50,7 +49,7 @@ class FireworksService {
 
       return data.choices[0].message.content;
     } catch (error) {
-      console.error('Fireworks API error:', error);
+      console.error('Mistral API error:', error);
       if (error instanceof Error) {
         throw new Error(`Failed to generate AI response: ${error.message}`);
       }
