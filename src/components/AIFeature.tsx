@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -100,11 +99,12 @@ export const AIFeature: React.FC<AIFeatureProps> = ({
 
   const formatAIResponse = (text: string): string => {
     return text
-      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') // Bold text
-      .replace(/\*(.*?)\*/g, '<em>$1</em>') // Italic text
-      .replace(/\n\n/g, '</p><p>') // Paragraphs
+      .replace(/##\s+(.*?)\n/g, '<h2 class="text-xl font-bold text-white mt-6 mb-3 border-b border-gray-600 pb-2">$1</h2>') // ## headings
+      .replace(/\*\*(.*?)\*\*/g, '<strong class="font-semibold text-blue-300">$1</strong>') // Bold text
+      .replace(/\*(.*?)\*/g, '<em class="italic text-gray-300">$1</em>') // Italic text
+      .replace(/\n\n/g, '</p><p class="mb-4">') // Paragraphs
       .replace(/\n/g, '<br>') // Line breaks
-      .replace(/^(.*)$/, '<p>$1</p>'); // Wrap in paragraph
+      .replace(/^(.*)$/, '<p class="mb-4">$1</p>'); // Wrap in paragraph
   };
 
   const handleSubmit = async () => {
